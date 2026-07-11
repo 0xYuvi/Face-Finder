@@ -95,9 +95,13 @@ def load_face_app(det_size: int = 640, use_gpu: bool = True):
     return app
 
 
-def build_known_embeddings(app: FaceAnalysis, known_dir: Path, min_size: int):
+def build_known_embeddings(app: FaceAnalysis, known_dir: Path, min_size: int, verbose: bool = False):
     people = {}
     entities = sorted(known_dir.iterdir())
+    
+    if verbose:
+        print(f"  Scanning: {known_dir}")
+        print(f"  Found {len(entities)} items: {[e.name for e in entities]}")
     
     for item in entities:
         embs = []
@@ -110,22 +114,35 @@ def build_known_embeddings(app: FaceAnalysis, known_dir: Path, min_size: int):
             person_name = item.stem
             target_files = [item]
         else:
+            if verbose:
+                print(f"  Skipping: {item.name} (not a directory or image)")
             continue
+        
+        if verbose:
+            print(f"  Processing '{person_name}': {len(target_files)} images")
             
         for img_path in target_files:
             try:
                 img = read_image_bgr(img_path)
                 faces = app.get(img)
                 if not faces:
+                    if verbose:
+                        print(f"    No faces detected in: {img_path.name}")
                     continue
                 f0 = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
                 x1, y1, x2, y2 = map(int, f0.bbox)
                 if (x2 - x1) < min_size or (y2 - y1) < min_size:
+                    if verbose:
+                        print(f"    Face too small ({x2-x1}x{y2-y1}) in: {img_path.name}")
                     continue
                 emb = f0.embedding
                 if emb is not None:
                     embs.append(emb.astype(np.float32))
-            except:
+                    if verbose:
+                        print(f"    Face found in: {img_path.name}")
+            except Exception as e:
+                if verbose:
+                    print(f"    Error reading {img_path.name}: {e}")
                 continue
                 
         if embs:
@@ -278,7 +295,7 @@ def main():
         return
 
     print("Building reference embeddings...")
-    people_embs = build_known_embeddings(app, known_dir, min_size=args.min_face)
+    people_embs = build_known_embeddings(app, known_dir, min_size=args.min_face, verbose=True)
     if not people_embs:
         print("No valid reference faces found in the 'Known' directory folders!")
         return
