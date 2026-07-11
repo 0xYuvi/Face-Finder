@@ -124,10 +124,13 @@ def build_known_embeddings(app: FaceAnalysis, known_dir: Path, min_size: int, ve
         for img_path in target_files:
             try:
                 img = read_image_bgr(img_path)
+                if verbose:
+                    h, w = img.shape[:2]
+                    print(f"    Read {img_path.name}: {w}x{h}")
                 faces = app.get(img)
+                if verbose:
+                    print(f"    Detector found {len(faces)} face(s)")
                 if not faces:
-                    if verbose:
-                        print(f"    No faces detected in: {img_path.name}")
                     continue
                 f0 = max(faces, key=lambda f: (f.bbox[2]-f.bbox[0])*(f.bbox[3]-f.bbox[1]))
                 x1, y1, x2, y2 = map(int, f0.bbox)
